@@ -1,0 +1,299 @@
+########################################################################
+########################################################################
+#Lab 11
+#Jake Schneider
+########################################################################
+########################################################################
+library(pwr)
+library(tidyverse)
+library(patchwork)
+library(effectsize)
+
+
+sample.size <- pwr.t.test(d = .65, sig.level = .05, 
+                          power = .8, type = "one.sample", alternative = "two.sided")
+
+
+##############
+#load data
+finch.dat <- read.csv("data.csv")
+
+finch.dat <- finch.dat |>
+  rename( Farther.vals = g.Farther_vals , 
+          Closer.vals = g.Closer_vals)|>
+  mutate(difference = Closer.vals - Farther.vals)
+
+
+#######################################################################
+#3
+
+############
+#a
+finch.dat |>
+  summarise(
+    mean = mean(Farther.vals),
+    sd = sd(Farther.vals),
+    min = min(Farther.vals),
+    max = max(Farther.vals)
+  )
+
+    
+############
+#b
+finch.dat |>
+  summarise(
+    mean = mean(Closer.vals),
+    sd = sd(Closer.vals),
+    min = min(Closer.vals),
+    max = max(Closer.vals)
+  )
+
+
+############
+#c
+finch.dat |>
+  summarise(
+    mean = mean(difference),
+    sd = sd(difference),
+    min = min(difference),
+    max = max(difference)
+  )
+
+
+finch_long <- finch.dat |>
+  pivot_longer(cols = c(Closer.vals, Farther.vals, difference),
+               names_to = "Condition",
+               values_to = "Dopamine")
+
+
+ggplot(finch_long, aes(x = Condition, y = Dopamine, fill = Condition)) +
+  geom_boxplot(width = 0.6, outlier.shape = 21, outlier.size = 2) +
+  labs(
+    title = "Dopamine Levels by Singing Distance",
+    x = "Condition",
+    y = "Dopamine (Δ Fluorescence)"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+
+#######################################################################
+#4
+
+#a T-test for closer values
+t.closer <- t.test(finch.dat$Closer.vals, mu = 0)
+g.closer <- hedges_g(finch.dat$Closer.vals, mu = 0)
+
+
+parenthetical.closer <- paste0(
+  "(t = ", round(t.closer$statistic, 2),
+  ", p = ", ifelse(t.closer$p.value < 0.0001, "< 0.0001", signif(t.closer$p.value, 3)),
+  "; d = ", round(g.closer, 2),
+  "; 95% CI: ", round(t.closer$conf.int[1], 2), ", ", round(t.closer$conf.int[2], 2), ")"
+)
+
+
+
+
+#b T-test for Farther values
+t.farther <- t.test(finch.dat$Farther.vals, mu = 0)
+g.farther <- hedges_g(finch.dat$Farther.vals, mu =0)
+
+
+parenthetical.farther <- paste0(
+  "(t = ", round(t.farther$statistic, 2),
+  ", p = ", ifelse(t.farther$p.value < 0.0001, "< 0.0001", signif(t.farther$p.value, 3)),
+  "; d = ", round(g.farther, 2),
+  "; 95% CI: ", round(t.farther$conf.int[1], 2), ", ", round(t.farther$conf.int[2], 2), ")"
+)
+
+
+#c T-test for difference (Closer - Farther)
+t.diff <- t.test(finch.dat$difference, mu = 0)
+g.diff <- hedges_g(finch.dat$difference, mu = 0)
+
+parenthetical.diff <- paste0( 
+  "(t = ", round(t.diff$statistic, 2),
+  ", p = ", ifelse(t.diff$p.value < 0.0001, "< 0.0001", signif(t.diff$p.value, 3)),
+  "; d = ", round(g.diff, 2),
+  "; 95% CI: ", round(t.diff$conf.int[1], 2), ", ", round(t.diff$conf.int[2], 2), ")"
+)
+
+parenthetical.closer[1]
+parenthetical.farther[1]
+parenthetical.diff[1]
+
+
+
+#######################################################################
+#5
+
+x <- finch.dat$Closer.vals
+mu0 <- 0
+xbar <- mean(x)
+s <- sd(x)
+n <- length(x)
+t.stat <- (xbar - mu0) / (s / sqrt(n))
+
+# -------- NULL DISTRIBUTION DATA --------
+ggdat.t <- tibble(t = seq(-5, 5, length.out = 1000)) |>
+  mutate(pdf.null = dt(t, df = n - 1))
+
+ggdat.obs <- tibble(t = t.stat, y = 0)
+
+# -------- BREAKPOINTS FOR LABELING --------
+t.breaks <- c(-5, qt(0.025, df = n - 1), 0, qt(0.975, df = n - 1), 5, t.stat)
+xbar.breaks <- t.breaks * s / sqrt(n) + mu0
+
+# -------- PLOT --------
+plot.close <- ggplot() +
+  geom_line(data = ggdat.t, aes(x = t, y = pdf.null)) +
+  geom_hline(yintercept = 0) +
+  
+  # Shade rejection regions
+  geom_ribbon(data = subset(ggdat.t, t <= qt(0.025, df = n - 1)), 
+              aes(x = t, ymin = 0, ymax = pdf.null), fill = "grey", alpha = 0.5) +
+  geom_ribbon(data = subset(ggdat.t, t >= qt(0.975, df = n - 1)), 
+              aes(x = t, ymin = 0, ymax = pdf.null), fill = "grey", alpha = 0.5) +
+  
+  # Mark observed t-stat
+  geom_point(data = ggdat.obs, aes(x = t, y = y), color = "red", size = 3) +
+  
+  # Axes & labels
+  theme_bw() +
+  scale_x_continuous("t", 
+                     breaks = round(t.breaks, 2),
+                     sec.axis = sec_axis(~ ., name = expression(bar(x)), 
+                                         breaks = t.breaks,
+                                         labels = round(xbar.breaks, 2))) +
+  ylab("Density") +
+  ggtitle("T-Test for Closer Responses",
+          subtitle = expression(H[0] == 0 ~ ";" ~ H[a] != 0))
+
+
+####################################
+x <- finch.dat$Farther.vals
+mu0 <- 0
+xbar <- mean(x)
+s <- sd(x)
+n <- length(x)
+t.stat <- (xbar - mu0) / (s / sqrt(n))
+
+# -------- NULL DISTRIBUTION DATA --------
+ggdat.t <- tibble(t = seq(-5, 5, length.out = 1000)) |>
+  mutate(pdf.null = dt(t, df = n - 1))
+
+ggdat.obs <- tibble(t = t.stat, y = 0)
+
+# -------- BREAKPOINTS FOR LABELING --------
+t.breaks <- c(-5, qt(0.025, df = n - 1), 0, qt(0.975, df = n - 1), 5, t.stat)
+xbar.breaks <- t.breaks * s / sqrt(n) + mu0
+
+# -------- PLOT --------
+plot.far <- ggplot() +
+  geom_line(data = ggdat.t, aes(x = t, y = pdf.null)) +
+  geom_hline(yintercept = 0) +
+  
+  # Shade rejection regions
+  geom_ribbon(data = subset(ggdat.t, t <= qt(0.025, df = n - 1)), 
+              aes(x = t, ymin = 0, ymax = pdf.null), fill = "grey", alpha = 0.5) +
+  geom_ribbon(data = subset(ggdat.t, t >= qt(0.975, df = n - 1)), 
+              aes(x = t, ymin = 0, ymax = pdf.null), fill = "grey", alpha = 0.5) +
+  
+  # Mark observed t-stat
+  geom_point(data = ggdat.obs, aes(x = t, y = y), color = "red", size = 3) +
+  
+  # Axes & labels
+  theme_bw() +
+  scale_x_continuous("t", 
+                     breaks = round(t.breaks, 2),
+                     sec.axis = sec_axis(~ ., name = expression(bar(x)), 
+                                         breaks = t.breaks,
+                                         labels = round(xbar.breaks, 2))) +
+  ylab("Density") +
+  ggtitle("T-Test for Farther Responses",
+          subtitle = expression(H[0] == 0 ~ ";" ~ H[a] != 0))
+
+
+####################################
+x <- finch.dat$difference
+mu0 <- 0
+xbar <- mean(x)
+s <- sd(x)
+n <- length(x)
+t.stat <- (xbar - mu0) / (s / sqrt(n))
+
+# -------- NULL DISTRIBUTION DATA --------
+ggdat.t <- tibble(t = seq(-5, 5, length.out = 1000)) |>
+  mutate(pdf.null = dt(t, df = n - 1))
+
+ggdat.obs <- tibble(t = t.stat, y = 0)
+
+# -------- BREAKPOINTS FOR LABELING --------
+t.breaks <- c(-5, qt(0.025, df = n - 1), 0, qt(0.975, df = n - 1), 5, t.stat)
+xbar.breaks <- t.breaks * s / sqrt(n) + mu0
+
+# -------- PLOT --------
+plot.diff <- ggplot() +
+  geom_line(data = ggdat.t, aes(x = t, y = pdf.null)) +
+  geom_hline(yintercept = 0) +
+  
+  # Shade rejection regions
+  geom_ribbon(data = subset(ggdat.t, t <= qt(0.025, df = n - 1)), 
+              aes(x = t, ymin = 0, ymax = pdf.null), fill = "grey", alpha = 0.5) +
+  geom_ribbon(data = subset(ggdat.t, t >= qt(0.975, df = n - 1)), 
+              aes(x = t, ymin = 0, ymax = pdf.null), fill = "grey", alpha = 0.5) +
+  
+  # Mark observed t-stat
+  geom_point(data = ggdat.obs, aes(x = t, y = y), color = "red", size = 3) +
+  
+  # Axes & labels
+  theme_bw() +
+  scale_x_continuous("t", 
+                     breaks = round(t.breaks, 2),
+                     sec.axis = sec_axis(~ ., name = expression(bar(x)), 
+                                         breaks = t.breaks,
+                                         labels = round(xbar.breaks, 2))) +
+  ylab("Density") +
+  ggtitle("T-Test for Difference",
+          subtitle = expression(H[0] == 0 ~ ";" ~ H[a] != 0))
+
+
+
+##############################################################################################
+##############################################################################################
+#one tailed test
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
