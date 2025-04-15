@@ -84,7 +84,7 @@ finch_long <- finch.dat |>
 boxplot.findat <- ggplot(finch_long, aes(x = Condition, y = Dopamine, fill = Condition)) +
   geom_boxplot(width = 0.6, outlier.shape = 21, outlier.size = 2) +
   labs(
-    title = "Dopamine Levels by Singing Distance",
+    title = "Level of Dopamine Change by Singing Distance",
     x = "Condition",
     y = "Dopamine"
   ) +
@@ -164,23 +164,30 @@ plot.2tailed.function <- function(x, title_sub = expression(H[0] == 0~";"~H[a] !
   
   ggplot() +
     # Null distribution
-    geom_line(data = ggdat.null, aes(x = t, y = pdf.null), color = "black", linewidth = 1) +
+    geom_line(data = ggdat.null, aes(x = t, y = pdf.null, color = "Null Distribution"), linewidth = 1) +
     
-    # Rejection region shading
+    # Rejection region shading (left)
     geom_ribbon(data = subset(ggdat.null, t <= qt(0.025, df = n - 1)),
-                aes(x = t, ymin = 0, ymax = pdf.null), fill = "grey", alpha = 0.4) +
+                aes(x = t, ymin = 0, ymax = pdf.null, fill = "Rejection Region"), alpha = 0.4) +
+    # Rejection region shading (right)
     geom_ribbon(data = subset(ggdat.null, t >= qt(0.975, df = n - 1)),
-                aes(x = t, ymin = 0, ymax = pdf.null), fill = "grey", alpha = 0.4) +
+                aes(x = t, ymin = 0, ymax = pdf.null, fill = "Rejection Region"), alpha = 0.4) +
     
-    # Resampled distribution from data (alternative)
-    stat_density(data = resamples, aes(x = t), geom = "line", color = "grey40", linewidth = 1) +
+    # Resampled distribution (alternative)
+    stat_density(data = resamples, aes(x = t, color = "Alternative Distribution"), geom = "line", linewidth = 1) +
     
     # Observed t-statistic
-    geom_point(aes(x = t.stat, y = 0), color = "red", size = 3) +
+    geom_point(aes(x = t.stat, y = 0, color = "Observed t-statistic"), size = 3) +
     geom_vline(xintercept = t.stat, color = "red", linetype = "dotted", linewidth = 1) +
     
-    # Aesthetic stuff
+    # Aesthetic tweaks
     geom_hline(yintercept = 0) +
+    scale_color_manual(name = "Legend", 
+                       values = c("Null Distribution" = "black", 
+                                  "Alternative Distribution" = "blue", 
+                                  "Observed t-statistic" = "red")) +
+    scale_fill_manual(name = "Legend", 
+                      values = c("Rejection Region" = "grey")) +
     scale_x_continuous("t", 
                        breaks = round(t.breaks, 2),
                        sec.axis = sec_axis(~ ., name = expression(bar(x)),
@@ -194,9 +201,10 @@ plot.2tailed.function <- function(x, title_sub = expression(H[0] == 0~";"~H[a] !
       plot.subtitle = element_text(size = 12),
       axis.title = element_text(size = 12),
       axis.text = element_text(size = 10),
-      legend.position = "none"
+      legend.position = "right"
     )
 }
+
 
 #use the function to graph the plots
 close.2tailed.plot <- plot.2tailed.function(finch.dat$Closer.vals, title_sub = expression(H[0] == 0 ~ ";" ~ H[a] != 0))
@@ -283,14 +291,20 @@ plot.1tailed.function <- function(x, alt = "greater",
   t.breaks <- c(-5, qt(0.05, df = n - 1), 0, qt(0.95, df = n - 1), 5, t.stat)
   xbar.breaks <- t.breaks * s / sqrt(n) + mu0
   
-  # Plot
+  # Combine all elements with mapping to aesthetics for legend
   ggplot() +
-    geom_line(data = ggdat.null, aes(x = t, y = pdf.null), color = "black", linewidth = 1) +
-    geom_ribbon(data = shade, aes(x = t, ymin = 0, ymax = pdf.null), fill = "grey", alpha = 0.4) +
-    stat_density(data = resamples, aes(x = t), geom = "line", color = "grey40", linewidth = 1) +
-    geom_point(aes(x = t.stat, y = 0), color = "red", size = 3) +
+    geom_line(data = ggdat.null, aes(x = t, y = pdf.null, color = "Null Distribution"), linewidth = 1) +
+    geom_ribbon(data = shade, aes(x = t, ymin = 0, ymax = pdf.null, fill = "Rejection Region"), alpha = 0.4) +
+    stat_density(data = resamples, aes(x = t, color = "Alternative Distribution"), geom = "line", linewidth = 1) +
+    geom_point(aes(x = t.stat, y = 0, color = "Observed t-statistic"), size = 3) +
     geom_vline(xintercept = t.stat, color = "red", linetype = "dotted", linewidth = 1) +
     geom_hline(yintercept = 0) +
+    scale_color_manual(name = "Legend", 
+                       values = c("Null Distribution" = "black", 
+                                  "Alternative Distribution" = "blue", 
+                                  "Observed t-statistic" = "red")) +
+    scale_fill_manual(name = "Legend", 
+                      values = c("Rejection Region" = "grey")) +
     scale_x_continuous("t", 
                        breaks = round(t.breaks, 2),
                        sec.axis = sec_axis(~ ., name = expression(bar(x)),
@@ -304,7 +318,7 @@ plot.1tailed.function <- function(x, alt = "greater",
       plot.subtitle = element_text(size = 12),
       axis.title = element_text(size = 12),
       axis.text = element_text(size = 10),
-      legend.position = "none"
+      legend.position = "right"
     )
 }
 
